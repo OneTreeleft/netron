@@ -2,7 +2,7 @@
 
 var armnn = armnn || {};
 var base = base || require('./base');
-var flatbuffers = flatbuffers || require('flatbuffers').flatbuffers;
+var flatbuffers = flatbuffers || require('./flatbuffers');
 var long = long || { Long: require('long') };
 
 armnn.ModelFactory = class {
@@ -20,10 +20,9 @@ armnn.ModelFactory = class {
             const identifier = context.identifier;
             let model = null;
             try {
-                const buffer = context.buffer;
-                const byteBuffer = new flatbuffers.ByteBuffer(buffer);
-                armnn.schema = schema.armnn_schema;
-                model = armnn.schema.SerializedGraph.getRootAsSerializedGraph(byteBuffer);
+                armnn.schema = flatbuffers.get('armnn').armnnSerializer;
+                const reader = new flatbuffers.Reader(context.buffer);
+                model = armnn.schema.SerializedGraph.create(reader);
             }
             catch (error) {
                 host.exception(error, false);
@@ -74,15 +73,15 @@ armnn.Graph = class {
 
         // generate parameters
         const args = {};
-        for (let i = 0; i < graph.layersLength(); i++) {
-            const base = armnn.Node.getBase(graph.layers(i));
+        for (let i = 0; i < graph.layers.length; i++) {
+            const base = armnn.Node.getBase(graph.layers[i]);
             for (let j = 0 ; j < base.outputSlotsLength() ; j++) {
                 const key = base.index().toString() + ':' + j.toString();
                 args[key] = new armnn.Argument(key, base.outputSlots(j).tensorInfo(), null);
             }
         }
-        for (let i = 0; i < graph.layersLength(); i++) {
-            const layer = graph.layers(i);
+        for (let i = 0; i < graph.layers.length; i++) {
+            const layer = graph.layers[i];
             const type = armnn.schema.LayerName[layer.layerType()];
             switch (type) {
                 case 'InputLayer': {

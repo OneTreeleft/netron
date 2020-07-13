@@ -2,7 +2,7 @@
 
 var mnn = mnn || {};
 var base = base || require('./base');
-var flatbuffers = flatbuffers || require('flatbuffers').flatbuffers;
+var flatbuffers = flatbuffers || require('./flatbuffers');
 
 mnn.ModelFactory = class {
 
@@ -19,9 +19,9 @@ mnn.ModelFactory = class {
             return mnn.Metadata.open(host).then((metadata) => {
                 const identifier = context.identifier;
                 try {
-                    mnn.schema = schema.mnn_schema;
-                    const byteBuffer = new flatbuffers.ByteBuffer(context.buffer);
-                    const net = mnn.schema.Net.getRootAsNet(byteBuffer);
+                    mnn.schema = flatbuffers.get('mnn').MNN;
+                    const reader = new flatbuffers.Reader(context.buffer);
+                    const net = mnn.schema.Net.create(reader);
                     return new mnn.Model(metadata, net);
                 }
                 catch (error) {
@@ -37,7 +37,7 @@ mnn.ModelFactory = class {
 mnn.Model = class {
 
     constructor(metadata, net) {
-        switch (net.sourceType()) {
+        switch (net.sourceType) {
             case mnn.schema.NetSource.CAFFE: this._source = 'Caffe'; break;
             case mnn.schema.NetSource.TENSORFLOW: this._source = 'TensorFlow'; break;
             case mnn.schema.NetSource.TFLITE: this._source = 'TensorFlow Lite'; break;
@@ -66,12 +66,12 @@ mnn.Graph = class {
         this._inputs = [];
         this._outputs = [];
         const inputSet = new Set();
-        for (let i = 0; i < net.oplistsLength(); i++) {
-            const op = net.oplists(i);
-            if (mnn.schema.OpTypeName[op.type()] === 'Input') {
+        for (let i = 0; i < net.oplists.length; i++) {
+            const op = net.oplists[i];
+            if (op.type === mnn.schema.OpType.Input) {
                 const args = [];
-                for (let j = 0; j < op.outputIndexesLength(); j++) {
-                    const index = op.outputIndexes(j);
+                for (let j = 0; j < op.outputIndexes.length; j++) {
+                    const index = op.outputIndexes[j];
                     const name = net.tensorName(index);
                     const extraTensorDescribe = net.extraTensorDescribe(index);
                     const blob = extraTensorDescribe ? extraTensorDescribe.blob() : null;
